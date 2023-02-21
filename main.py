@@ -17,7 +17,7 @@ pd.options.mode.chained_assignment = None  # default='warn'
 
 root = Tk()
 direc = filedialog.askdirectory(title = 'Select a Folder')
-files = [i for i in os.listdir(direc) if '.tif' in i]
+files = [i for i in os.listdir(direc) if '.tiff' in i]
 
 if not os.path.exists(os.path.join(direc, 'sholl_output')):
     os.mkdir(os.path.join(direc, 'sholl_output'))
@@ -32,9 +32,9 @@ os.chdir(output_direc)
 
 ring_params = {
 
-'start_radius': 25,
-'step_size' : 30,
-'end_radius' : 500
+'start_radius': 15,
+'step_size' : 10,
+'end_radius' : 200
 
 }
 
@@ -46,12 +46,14 @@ for file in files:
 
     if not os.path.exists(os.path.join(output_direc, file[0:-4] + '_raw_intersections.csv')):
 
-
         #read in img
         img = cv2.imread(os.path.join(direc, file))
 
         #skeletonize img using scikit-img skeletonize fxn, lee's method same as Fiji
-        skeleton = skeletonize(np.invert(img), method = 'lee')
+        img = img - 1
+        img_new = 1 - img
+        skeleton = skeletonize(img_new)
+        img_new = np.where(img_new > 0, 255, 0)
 
         #process to remove small objects
         processed = morphology.remove_small_objects(skeleton.astype(bool), min_size=10, connectivity=25).astype(int)
@@ -65,7 +67,7 @@ for file in files:
                 processed_skeleton[i][j] = processed[i][j][1]
 
         #plotting original image to get center pt
-        plt.imshow(img)
+        plt.imshow(img_new)
         plt.title('Pls select center')
         center = plt.ginput(1)
         plt.close()
@@ -100,7 +102,7 @@ for file in files:
         for circ in circles:
             ax1.imshow(circ, interpolation='nearest', origin='lower', cmap = cmap2)
         ax1.invert_yaxis()
-        ax2.imshow(img)
+        ax2.imshow(img_new)
         plt.show()
 
         ## making the skeleton thicc so that we don't miss any overlaps
@@ -215,7 +217,7 @@ for file in files:
         ax1.scatter(y_ep, x_ep, marker = '^')
         plt.savefig('sholl_' + file + '.png')
         plt.show()
-        plt.ginput(1)
+        # plt.ginput(1)
         plt.close()
 
 print('All finished!')

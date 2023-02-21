@@ -14,8 +14,20 @@ os.chdir(direc)
 ## making a list of only the relevant files
 files = [file for file in os.listdir(direc) if '.csv' in file]
 
+## change these to make sure that all your data for all rings is extracted appropriately!
+ring_params = {
+
+'start_radius': 15,
+'step_size' : 10,
+'end_radius' : 200
+
+}
+
+rads = np.arange(ring_params['start_radius'], ring_params['end_radius'], ring_params['step_size'])
+final_df = pd.DataFrame(index = rads)
+
 ## initializing an empty dataframe and dict to store the data
-final_df = pd.DataFrame(index = np.unique(pd.read_csv(os.path.join(direc, files[0]), index_col = 0).index))
+#final_df = pd.DataFrame(index = np.unique(pd.read_csv(os.path.join(direc, files[0]), index_col = 0).index))
 endpoints = {}
 
 ## iterating through each file in the list
@@ -31,6 +43,7 @@ for file in files:
     ## and saving it to the output dataframe
     int_df = pd.DataFrame(np.unique(df.index, return_counts = True)).T.set_index(0).rename(columns = {1: file})
     final_df = final_df.join(int_df)
+    print(final_df)
     
 epts_df = pd.DataFrame(endpoints, index = [0]).T.rename(columns = {0: 'endpoints'})
 
