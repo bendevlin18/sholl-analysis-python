@@ -47,6 +47,8 @@ pip install -e .
 
 ## Quick Start
 
+#### NOTE: This package does not inherently work with Jupyter notebooks. Because of the interactivity of the matplotlib objects it creates, Jupyter Notebooks can cause issues based on Matplotlib backends. Thus, the easiest way to run it is via the command line. I generally recommend folks just type 'python' while in the active sholl conda environment to enter interactive python in the terminal. From there, you can just copy and past the three lines below, replacing the path string with the actual path of your tiff files (note it also works with .tif, .png, and .jpgs).
+
 ```python
 from sholl_analysis import ShollAnalyzer
 
