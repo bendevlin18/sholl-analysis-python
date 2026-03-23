@@ -37,8 +37,8 @@ conda activate sholl
 **Install from source:**
 
 ```bash
-git clone https://github.com/yourname/sholl-analysis.git
-cd sholl-analysis
+git clone https://github.com/bendevlin18/sholl-analysis-python.git
+cd sholl-analysis-python/sholl_analysis_v6
 pip install --upgrade pip
 pip install -e .
 ```
