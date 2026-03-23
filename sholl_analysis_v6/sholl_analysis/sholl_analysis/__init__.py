@@ -29,6 +29,7 @@ from .image_processing import (
 )
 from .geometry import make_circles, calc_intersection
 from .io import save_intersections, load_intersections
+from .supported_formats import is_supported, get_stem, SUPPORTED_EXTENSIONS
 from .test_images import generate_microglia, generate_test_dataset, generate_encoding_test_set, KNOWN_ENCODINGS
 
 __version__ = "0.2.0"

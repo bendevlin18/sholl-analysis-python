@@ -18,13 +18,13 @@ from .analyzer import ShollAnalyzer
 def main():
     parser = argparse.ArgumentParser(
         prog="sholl-analysis",
-        description="Sholl analysis of microscopy images (.tiff).",
+        description="Sholl analysis of microscopy images (.tiff, .tif, .png, .jpg).",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
 
     # I/O
     parser.add_argument("--input",  "-i", required=True,
-                        help="Directory containing .tiff images.")
+                        help="Directory containing images (.tiff, .tif, .png, .jpg).")
     parser.add_argument("--output", "-o", default=None,
                         help="Output directory (default: <input>/sholl_output).")
 

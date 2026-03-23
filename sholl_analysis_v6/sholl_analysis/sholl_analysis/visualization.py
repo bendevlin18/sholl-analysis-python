@@ -5,19 +5,51 @@ Plotting helpers for Sholl analysis results.
 """
 
 import numpy as np
-import matplotlib as mpl
 import matplotlib.pyplot as plt
-from matplotlib.colors import colorConverter
+from matplotlib.patches import Circle
 
 
-def _make_ring_cmap():
-    """Build a white-to-black colormap with increasing alpha for ring overlay."""
-    color1 = colorConverter.to_rgba("white")
-    color2 = colorConverter.to_rgba("black")
-    cmap = mpl.colors.LinearSegmentedColormap.from_list("sholl_rings", [color1, color2], 256)
-    cmap._init()
-    cmap._lut[:, -1] = np.linspace(0, 0.8, cmap.N + 3)
-    return cmap
+def _draw_rings(ax, center, circles, image_shape):
+    """
+    Draw Sholl rings as matplotlib Circle patches directly onto *ax*.
+
+    This approach is backend- and OS-independent — it avoids the alpha
+    colormap overlay that renders invisibly on some macOS backends.
+
+    Parameters
+    ----------
+    ax : matplotlib.axes.Axes
+    center : tuple
+        (x, y) soma centre from ginput — i.e. (col, row).
+    circles : list of np.ndarray
+        Circle arrays from :func:`geometry.make_circles`.  We use them only
+        to infer the radii; the actual drawing is done via Circle patches.
+    image_shape : tuple of int
+        (rows, cols) shape of the image, used to derive pixel radii.
+    """
+    # Recover radii from the circle arrays by finding where pixels == 255
+    # and computing the distance to centre — but it's faster to just count
+    # the ring arrays and reconstruct radii from the known step pattern.
+    # We detect the radius for each ring by finding the bounding box of its
+    # 255-pixels and halving the width.
+    cx, cy = center[0][0], center[0][1]
+
+    for i, circ_arr in enumerate(circles):
+        rows, cols = np.where(circ_arr == 255)
+        if len(rows) == 0:
+            continue
+        # Radius = mean distance of ring pixels from centre
+        radius = np.mean(np.sqrt((cols - cx) ** 2 + (rows - cy) ** 2))
+        patch = Circle(
+            (cx, cy),
+            radius=radius,
+            fill=False,
+            edgecolor="cyan",
+            linewidth=0.8,
+            alpha=0.6,
+            zorder=3,
+        )
+        ax.add_patch(patch)
 
 
 def plot_preview(
@@ -27,18 +59,17 @@ def plot_preview(
     circles: list,
 ) -> plt.Figure:
     """Side-by-side preview: original image (left) and skeleton + rings (right)."""
-    cmap2 = _make_ring_cmap()
     fig, (ax_orig, ax_skel) = plt.subplots(1, 2, figsize=(14, 5))
 
     ax_orig.imshow(img_new, cmap="gray")
     ax_orig.set_title("Original Image")
 
-    ax_skel.scatter(center[0][0], center[0][1])
-    ax_skel.imshow(processed_skeleton, origin="lower", cmap="gray")
+    ax_skel.imshow(processed_skeleton, cmap="gray")
     ax_skel.set_title("Look good??")
-    for circ in circles:
-        ax_skel.imshow(circ, interpolation="nearest", origin="lower", cmap=cmap2)
-    ax_skel.invert_yaxis()
+    _draw_rings(ax_skel, center, circles, processed_skeleton.shape)
+    ax_skel.scatter(center[0][0], center[0][1], c="blue", s=40, zorder=5,
+                    label="centre")
+    ax_skel.legend(fontsize=8)
 
     return fig
 
@@ -76,20 +107,19 @@ def plot_results(
     dpi : int, optional
         Resolution for saved figure (default 150).
     """
-    cmap2 = _make_ring_cmap()
     fig, ax = plt.subplots(1, figsize=(10, 10))
 
-    ax.scatter(center[0][0], center[0][1], zorder=5)
-    ax.imshow(processed_skeleton, origin="lower", cmap="gray")
+    ax.imshow(processed_skeleton, cmap="gray")
     ax.set_title(title)
 
-    for circ in circles:
-        ax.imshow(circ, interpolation="nearest", origin="lower", cmap=cmap2)
+    _draw_rings(ax, center, circles, processed_skeleton.shape)
 
-    ax.invert_yaxis()
+    ax.scatter(center[0][0], center[0][1], c="blue", s=40, zorder=5,
+               label="centre")
     ax.scatter(intersections_to_plot[1].values, intersections_to_plot[0].values,
-               label="intersections", zorder=4)
-    ax.scatter(y_ep, x_ep, marker="^", label="endpoints", zorder=4)
+               c="orange", s=30, label="intersections", zorder=4)
+    ax.scatter(y_ep, x_ep, c="lime", marker="^", s=30,
+               label="endpoints", zorder=4)
     ax.legend()
 
     if save_path:

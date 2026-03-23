@@ -143,3 +143,54 @@ def test_generate_test_dataset_files():
         for p in paths:
             assert os.path.exists(p)
             assert p.endswith(".tiff")
+
+
+# ---------------------------------------------------------------------------
+# Tests for supported_formats
+# ---------------------------------------------------------------------------
+
+from sholl_analysis.supported_formats import is_supported, get_stem, SUPPORTED_EXTENSIONS
+
+def test_is_supported_tiff():
+    assert is_supported("cell.tiff")
+
+def test_is_supported_tif():
+    assert is_supported("cell.tif")
+
+def test_is_supported_png():
+    assert is_supported("cell.png")
+
+def test_is_supported_jpg():
+    assert is_supported("cell.jpg")
+
+def test_is_supported_jpeg():
+    assert is_supported("cell.jpeg")
+
+def test_is_supported_case_insensitive():
+    assert is_supported("cell.TIFF")
+    assert is_supported("cell.PNG")
+    assert is_supported("cell.JPG")
+
+def test_is_supported_rejects_other():
+    assert not is_supported("cell.bmp")
+    assert not is_supported("cell.txt")
+    assert not is_supported("cell")
+
+def test_get_stem_tiff():
+    assert get_stem("cell_01.tiff") == "cell_01"
+
+def test_get_stem_tif():
+    assert get_stem("cell_01.tif") == "cell_01"
+
+def test_get_stem_png():
+    assert get_stem("cell_01.png") == "cell_01"
+
+def test_get_stem_jpg():
+    assert get_stem("cell_01.jpg") == "cell_01"
+
+def test_get_stem_uppercase():
+    assert get_stem("cell_01.TIFF") == "cell_01"
+
+def test_get_stem_dotted_name():
+    # Names with dots in them should only strip the extension
+    assert get_stem("cell.01.png") == "cell.01"

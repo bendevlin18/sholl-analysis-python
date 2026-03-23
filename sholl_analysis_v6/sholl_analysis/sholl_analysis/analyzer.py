@@ -21,6 +21,7 @@ from .image_processing import (
 from .geometry import make_circles, calc_intersection, x_y_separate, clean_intersections
 from .visualization import plot_preview, plot_results, plot_sholl_curve
 from .io import save_intersections, ensure_output_dirs, csv_exists
+from .supported_formats import is_supported, get_stem, extensions_str
 
 
 class UserCancelledError(Exception):
@@ -28,15 +29,62 @@ class UserCancelledError(Exception):
     pass
 
 
-def _ask_continue(prompt: str) -> str:
+def _wait_for_key(fig, prompt: str, valid_keys: dict) -> str:
     """
-    Print *prompt* and return the user's response (stripped, lower-cased).
-    Handles EOF gracefully (e.g. non-interactive environments).
+    Display *prompt* in the figure title and block until the user presses
+    one of the keys in *valid_keys*.  Returns the corresponding action string.
+
+    This keeps the matplotlib event loop alive on the main thread (required
+    on macOS) while still waiting for user input — avoiding the freeze caused
+    by mixing ``plt.show(block=False)`` with ``input()``.
+
+    Parameters
+    ----------
+    fig : matplotlib.figure.Figure
+    prompt : str
+        Shown in the figure suptitle so the user knows what to press.
+    valid_keys : dict
+        Mapping of key strings → action strings.
+        Special key ``""`` is used as the default for Enter/Return.
+        Example::
+
+            {"enter": "ok", " ": "ok", "s": "skip", "q": "quit", "r": "redo"}
+
+    Returns
+    -------
+    str
+        One of the values from *valid_keys*.
     """
-    try:
-        return input(prompt).strip().lower()
-    except EOFError:
-        return "q"
+    result = [None]   # mutable container so the callback can write to it
+
+    key_hint = "  |  ".join(f"[{k}] {v}" for k, v in valid_keys.items())
+    fig.suptitle(f"{prompt}\n{key_hint}", fontsize=9, color="white",
+                 bbox=dict(facecolor="black", alpha=0.6, pad=4))
+    fig.canvas.draw_idle()
+
+    def _on_key(event):
+        k = (event.key or "").lower()
+        # Treat enter / return / space as the first listed key if it maps to ok
+        if k in ("enter", "return", " ", ""):
+            k = "enter"
+        if k in valid_keys:
+            result[0] = valid_keys[k]
+            plt.close(fig)
+
+    cid = fig.canvas.mpl_connect("key_press_event", _on_key)
+
+    # Also handle window-close as a cancel/skip
+    def _on_close(event):
+        if result[0] is None:
+            result[0] = valid_keys.get("close", "skip")
+
+    fig.canvas.mpl_connect("close_event", _on_close)
+
+    # Block here — plt.show() runs the event loop until the figure is closed
+    plt.show(block=True)
+    fig.canvas.mpl_disconnect(cid)
+
+    return result[0] or "skip"
 
 
 class ShollAnalyzer:
@@ -122,18 +170,29 @@ class ShollAnalyzer:
         """
         Process all TIFF images in *input_dir*.
 
-        Prompts after each image's preview:
-          - Enter / y  → process and continue
-          - s          → skip this image (no output written)
-          - r          → redo centre selection
-          - q          → stop and save progress
+        All prompts appear as keyboard shortcuts on the figure itself —
+        no terminal input required. Ctrl+C in the terminal exits cleanly.
 
-        Ctrl+C exits cleanly at any point, saving all completed images.
+        Controls
+        --------
+        Centre-selection window:
+          - Click soma, then close window or press Enter to confirm
+          - Close without clicking to skip
+
+        Preview window:
+          - Enter / Space  → process and continue
+          - s              → skip this image
+          - r              → redo centre selection
+          - q              → quit and save progress
+
+        Results window (if shown):
+          - Enter / Space / any key → next image
+          - q                       → quit
 
         Parameters
         ----------
         input_dir : str
-            Folder containing ``.tiff`` images.
+            Folder containing image files.
         output_dir : str or None, optional
             Root output folder. Defaults to ``<input_dir>/sholl_output``.
 
@@ -142,21 +201,21 @@ class ShollAnalyzer:
         summary : pd.DataFrame
             One row per completed image; columns are per-radius intersection counts.
         """
-        # Build the full subfolder tree up front
         if output_dir is None:
             dirs = ensure_output_dirs(input_dir)
         else:
             dirs = ensure_output_dirs(os.path.dirname(output_dir),
                                       subdir=os.path.basename(output_dir))
 
-        files = sorted(f for f in os.listdir(input_dir) if f.lower().endswith(".tiff"))
+        files = sorted(f for f in os.listdir(input_dir) if is_supported(f))
         if not files:
-            raise FileNotFoundError(f"No .tiff files found in {input_dir!r}")
+            raise FileNotFoundError(
+                f"No supported images ({extensions_str()}) found in {input_dir!r}"
+            )
 
-        # Separate already-done from pending
         pending, already_done = [], []
         for f in files:
-            stem = f[:-5]
+            stem = get_stem(f)
             if csv_exists(dirs["root"], stem):
                 already_done.append(f)
             else:
@@ -170,7 +229,7 @@ class ShollAnalyzer:
             print("Nothing to do — all images already processed.")
             return self._load_existing_summary(dirs["root"])
 
-        print("Press Ctrl+C at any time to stop cleanly.\n")
+        print("Tip: all controls are keyboard shortcuts on the figure window.\n")
 
         summary_rows = {}
         skipped = []
@@ -178,7 +237,7 @@ class ShollAnalyzer:
         try:
             for idx, filename in enumerate(pending, 1):
                 filepath = os.path.join(input_dir, filename)
-                stem = filename[:-5]
+                stem = get_stem(filename)
                 print(f"[{idx}/{len(pending)}] {filename}")
 
                 try:
@@ -225,7 +284,7 @@ class ShollAnalyzer:
             Per-radius intersection counts.
         """
         if stem is None:
-            stem = os.path.basename(filepath).replace(".tiff", "")
+            stem = get_stem(os.path.basename(filepath))
         dirs = ensure_output_dirs(os.path.dirname(output_dir),
                                   subdir=os.path.basename(output_dir))
         counts, _ = self._process_image(filepath, stem, dirs)
@@ -248,38 +307,49 @@ class ShollAnalyzer:
         # 2. Skeletonize
         skeleton = skeletonize_image(img_new, min_size=self.min_object_size)
 
-        # 3. Centre selection
-        plt.imshow(img_new, cmap="gray")
-        plt.title("Click the soma centre, then press Enter  |  Close to skip")
-        try:
-            center = plt.ginput(1, timeout=0)
-        except Exception:
-            center = []
-        plt.close()
+        # 3. Centre selection — ginput handles its own event loop cleanly
+        fig_centre, ax_centre = plt.subplots(figsize=(7, 7))
+        ax_centre.imshow(img_new, cmap="gray")
+        ax_centre.set_title(
+            "Click the soma centre, then close the window\n"
+            "(close without clicking to skip this image)",
+            fontsize=9,
+        )
+        fig_centre.tight_layout()
+        center = plt.ginput(1, timeout=0)   # blocks until click + close
+        plt.close(fig_centre)
 
         if not center:
-            resp = _ask_continue("  No centre selected. [s]kip / [q]uit? ")
-            raise UserCancelledError("quit" if resp == "q" else "skip")
+            print("  No centre selected.")
+            # Ask via a tiny dialog figure rather than terminal input
+            action = self._ask_figure("No centre selected — what next?",
+                                      {"s": "skip", "q": "quit"})
+            raise UserCancelledError(action)
 
         # 4. Build Sholl rings
         circles = make_circles(center[0], self.radii, skeleton.shape)
 
-        # 5. Preview
+        # 5. Preview — response collected via keypress on the figure
         fig_preview = plot_preview(img_new, skeleton, center, circles)
-        plt.show(block=False)
-        plt.pause(0.1)
-
-        resp = _ask_continue(
-            "  [Enter/y] continue  |  [s] skip  |  [q] quit  |  [r] redo centre: "
+        fig_preview.suptitle(stem, fontsize=10)
+        resp = _wait_for_key(
+            fig_preview,
+            prompt="Preview — does this look right?",
+            valid_keys={
+                "enter": "ok", " ": "ok",
+                "s": "skip",
+                "q": "quit",
+                "r": "redo",
+                "close": "ok",   # closing the window = accept
+            },
         )
-        plt.close(fig_preview)
 
-        if resp == "q":
+        if resp == "quit":
             raise UserCancelledError("quit")
-        if resp == "s":
+        if resp == "skip":
             raise UserCancelledError("skip")
-        if resp == "r":
-            print("  Restarting centre selection …")
+        if resp == "redo":
+            print("  Redoing centre selection …")
             return self._process_image(filepath, stem, dirs)
 
         # 6. Dilate skeleton + count intersections
@@ -295,13 +365,14 @@ class ShollAnalyzer:
                 intersection_counts.append(len(hits) / 2)
         except KeyboardInterrupt:
             print("\n  Counting interrupted.")
-            resp = _ask_continue("  [s] skip  |  [q] quit: ")
-            raise UserCancelledError("quit" if resp == "q" else "skip")
+            raise UserCancelledError("skip")
 
         intersection_counts = np.array(intersection_counts)
 
         # 7. Clean duplicates
-        intersections_to_plot = clean_intersections(raw_z, self.radii, merge_dist=self.merge_dist)
+        intersections_to_plot = clean_intersections(
+            raw_z, self.radii, merge_dist=self.merge_dist
+        )
 
         # 8. Endpoints
         endpoint_arr, n_endpoints = find_endpoints(skeleton)
@@ -329,9 +400,15 @@ class ShollAnalyzer:
             dpi=self.figure_dpi,
         )
         if self.show_results_plot:
-            plt.show(block=False)
-            plt.pause(0.1)
-        plt.close(fig_results)
+            resp = _wait_for_key(
+                fig_results,
+                prompt="Results",
+                valid_keys={"enter": "ok", " ": "ok", "q": "quit", "close": "ok"},
+            )
+            if resp == "quit":
+                raise UserCancelledError("quit")
+        else:
+            plt.close(fig_results)
 
         # 12. Sholl curve → sholl_curves/
         curve_path = (
@@ -345,23 +422,36 @@ class ShollAnalyzer:
             dpi=self.figure_dpi,
         )
         if self.show_sholl_curve:
-            plt.show(block=False)
-            plt.pause(0.1)
-        plt.close(fig_curve)
+            resp = _wait_for_key(
+                fig_curve,
+                prompt="Sholl curve",
+                valid_keys={"enter": "ok", " ": "ok", "q": "quit", "close": "ok"},
+            )
+            if resp == "quit":
+                raise UserCancelledError("quit")
+        else:
+            plt.close(fig_curve)
 
         # 13. Quick inline summary
         max_idx = np.argmax(intersection_counts)
-        print(f"  ✓  {n_endpoints} endpoints  |  "
-              f"peak {int(intersection_counts[max_idx])} intersections "
-              f"@ radius {self.radii[max_idx]}px")
+        print(
+            f"  ✓  {n_endpoints} endpoints  |  "
+            f"peak {int(intersection_counts[max_idx])} intersections "
+            f"@ radius {self.radii[max_idx]}px"
+        )
 
-        resp = _ask_continue("  [Enter] next image  |  [q] quit: ")
         plt.close("all")
-
-        if resp == "q":
-            raise UserCancelledError("quit")
-
         return intersection_counts, "ok"
+
+    def _ask_figure(self, message: str, valid_keys: dict) -> str:
+        """Show a minimal figure with a message and wait for a keypress."""
+        fig, ax = plt.subplots(figsize=(4, 2))
+        ax.axis("off")
+        key_hint = "  |  ".join(f"[{k}] {v}" for k, v in valid_keys.items())
+        ax.text(0.5, 0.5, f"{message}\n\n{key_hint}",
+                ha="center", va="center", transform=ax.transAxes, fontsize=11)
+        result = _wait_for_key(fig, message, {**valid_keys, "close": "skip"})
+        return result
 
     def _load_existing_summary(self, output_root: str) -> pd.DataFrame:
         """Load and return an existing summary CSV if present."""
