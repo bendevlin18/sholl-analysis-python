@@ -1,0 +1,2 @@
+[console_scripts]
+sholl-analysis = sholl_analysis.cli:main

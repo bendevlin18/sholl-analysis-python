@@ -148,6 +148,9 @@ class ShollAnalyzer:
         save_figures: bool = True,
         figure_dpi: int = 150,
         gaussian_sigma: float = 0.0,
+        intersection_size: int = 12,
+        show_endpoints: bool = False,
+        endpoint_size: int = 15,
     ):
         self.start_radius = start_radius
         self.step_size = step_size
@@ -160,6 +163,9 @@ class ShollAnalyzer:
         self.save_figures = save_figures
         self.figure_dpi = figure_dpi
         self.gaussian_sigma = gaussian_sigma
+        self.intersection_size = intersection_size
+        self.show_endpoints = show_endpoints
+        self.endpoint_size = endpoint_size
         self.radii = np.arange(start_radius, end_radius, step_size)
 
     # ------------------------------------------------------------------
@@ -398,6 +404,9 @@ class ShollAnalyzer:
             skeleton, center, circles, intersections_to_plot,
             x_ep, y_ep, title=stem, save_path=results_path,
             dpi=self.figure_dpi,
+            intersection_size=self.intersection_size,
+            show_endpoints=self.show_endpoints,
+            endpoint_size=self.endpoint_size,
         )
         if self.show_results_plot:
             resp = _wait_for_key(

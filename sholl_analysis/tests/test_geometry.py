@@ -194,3 +194,12 @@ def test_get_stem_uppercase():
 def test_get_stem_dotted_name():
     # Names with dots in them should only strip the extension
     assert get_stem("cell.01.png") == "cell.01"
+
+
+def test_normalize_inverted_0_255():
+    """255 should be treated as background when it is the majority class."""
+    arr = _make_binary(255, 0)   # background=255, signal=0
+    out = detect_and_normalize(arr)
+    # signal pixels (0 in input) should become 255 in output
+    assert np.all(out[arr == 0] == 255)
+    assert np.all(out[arr == 255] == 0)

@@ -51,13 +51,15 @@ def detect_and_normalize(img: np.ndarray) -> np.ndarray:
     ======================================  ================================
     Input unique values                     Convention assumed
     ======================================  ================================
-    ``{0, 255}``                            Already correct — pass through.
-    Any other two-value image               Signal = minority class.
+    Any two-value image                     Signal = minority class.
     ======================================  ================================
 
-    The minority-class heuristic works because microglia/neuron processes
-    occupy a small fraction of the image frame, so the background is always
-    the majority class regardless of whether it is encoded as 0, 1, or 2.
+    The minority-class heuristic is applied to **all** binary images,
+    including ``{0, 255}``.  This is safer than a ``{0, 255}`` passthrough
+    because datasets often mix conventions — one image may use 255=signal
+    while another uses 0=signal.  Since microglia/neuron processes occupy
+    a small fraction of the frame, the cell is always the minority class
+    regardless of encoding.
 
     Parameters
     ----------
@@ -89,20 +91,23 @@ def detect_and_normalize(img: np.ndarray) -> np.ndarray:
             f"Make sure the image is a binary segmentation."
         )
 
-    # Already correct
-    if set(unique_vals) == {0, 255}:
-        return img.astype(np.uint8)
-
-    # Any other two-value encoding ({0,1}, {1,2}, {1,255}, etc.)
+    # Apply minority-class heuristic to ALL two-value images, including {0, 255}.
+    # A {0, 255} passthrough is NOT safe when conventions differ across a dataset
+    # — e.g. one image may use 255=signal while another uses 0=signal.
+    # The minority class is always the cell, so we apply the same logic uniformly.
     vals, counts = np.unique(img.flatten(), return_counts=True)
     signal_val = vals[np.argmin(counts)]
     normalized = np.where(img == signal_val, 255, 0).astype(np.uint8)
 
     detected_str = "{" + str(vals[0]) + ", " + str(vals[1]) + "}"
-    print(
-        f"  [normalize] Detected pixel values {detected_str} — "
-        f"treating {signal_val} as signal (minority class)."
-    )
+    if set(unique_vals) == {0, 255} and signal_val == 255:
+        # Most common case — log quietly
+        print(f"  [normalize] Detected pixel values {detected_str} — standard encoding.")
+    else:
+        print(
+            f"  [normalize] Detected pixel values {detected_str} — "
+            f"treating {signal_val} as signal (minority class)."
+        )
 
     return normalized
 

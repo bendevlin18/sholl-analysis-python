@@ -15,30 +15,12 @@ def _draw_rings(ax, center, circles, image_shape):
 
     This approach is backend- and OS-independent — it avoids the alpha
     colormap overlay that renders invisibly on some macOS backends.
-
-    Parameters
-    ----------
-    ax : matplotlib.axes.Axes
-    center : tuple
-        (x, y) soma centre from ginput — i.e. (col, row).
-    circles : list of np.ndarray
-        Circle arrays from :func:`geometry.make_circles`.  We use them only
-        to infer the radii; the actual drawing is done via Circle patches.
-    image_shape : tuple of int
-        (rows, cols) shape of the image, used to derive pixel radii.
     """
-    # Recover radii from the circle arrays by finding where pixels == 255
-    # and computing the distance to centre — but it's faster to just count
-    # the ring arrays and reconstruct radii from the known step pattern.
-    # We detect the radius for each ring by finding the bounding box of its
-    # 255-pixels and halving the width.
     cx, cy = center[0][0], center[0][1]
-
-    for i, circ_arr in enumerate(circles):
+    for circ_arr in circles:
         rows, cols = np.where(circ_arr == 255)
         if len(rows) == 0:
             continue
-        # Radius = mean distance of ring pixels from centre
         radius = np.mean(np.sqrt((cols - cx) ** 2 + (rows - cy) ** 2))
         patch = Circle(
             (cx, cy),
@@ -84,6 +66,9 @@ def plot_results(
     title: str = "",
     save_path: str | None = None,
     dpi: int = 150,
+    intersection_size: int = 12,
+    show_endpoints: bool = False,
+    endpoint_size: int = 15,
 ) -> plt.Figure:
     """
     Final results figure: skeleton, rings, intersection scatter, and endpoints.
@@ -106,6 +91,12 @@ def plot_results(
         If given, the figure is saved to this path.
     dpi : int, optional
         Resolution for saved figure (default 150).
+    intersection_size : int, optional
+        Marker size for intersection dots (default 12).
+    show_endpoints : bool, optional
+        Whether to plot endpoint triangles (default False).
+    endpoint_size : int, optional
+        Marker size for endpoint triangles (default 15).
     """
     fig, ax = plt.subplots(1, figsize=(10, 10))
 
@@ -116,10 +107,20 @@ def plot_results(
 
     ax.scatter(center[0][0], center[0][1], c="blue", s=40, zorder=5,
                label="centre")
-    ax.scatter(intersections_to_plot[1].values, intersections_to_plot[0].values,
-               c="orange", s=30, label="intersections", zorder=4)
-    ax.scatter(y_ep, x_ep, c="lime", marker="^", s=30,
-               label="endpoints", zorder=4)
+    ax.scatter(
+        intersections_to_plot[1].values,
+        intersections_to_plot[0].values,
+        c="orange", s=intersection_size,
+        label="intersections", zorder=4,
+    )
+
+    if show_endpoints:
+        ax.scatter(
+            y_ep, x_ep,
+            c="lime", marker="^", s=endpoint_size,
+            label="endpoints", zorder=4,
+        )
+
     ax.legend()
 
     if save_path:
