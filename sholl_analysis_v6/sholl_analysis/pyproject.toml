@@ -1,0 +1,42 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "sholl-analysis"
+version = "0.1.0"
+description = "Sholl analysis of neuron/microglia microscopy images"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+
+keywords = ["neuroscience", "microscopy", "sholl", "image-analysis", "microglia"]
+
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Topic :: Scientific/Engineering :: Image Processing",
+    "Topic :: Scientific/Engineering :: Bio-Informatics",
+]
+
+dependencies = [
+    "numpy>=1.24",
+    "pandas>=2.0",
+    "opencv-python>=4.8",
+    "matplotlib>=3.7",
+    "scikit-image>=0.21",
+    "scipy>=1.11",
+    "tqdm>=4.65",
+]
+
+[project.scripts]
+sholl-analysis = "sholl_analysis.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/yourname/sholl-analysis"
+Issues   = "https://github.com/yourname/sholl-analysis/issues"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["sholl_analysis*"]
