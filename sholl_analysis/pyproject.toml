@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "sholl-analysis"
-version = "0.1.0"
+version = "0.2.0"
 description = "Sholl analysis of neuron/microglia microscopy images"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -34,8 +34,8 @@ dependencies = [
 sholl-analysis = "sholl_analysis.cli:main"
 
 [project.urls]
-Homepage = "https://github.com/yourname/sholl-analysis"
-Issues   = "https://github.com/yourname/sholl-analysis/issues"
+Homepage = "https://github.com/bendevlin18/sholl-analysis-python"
+Issues   = "https://github.com/bendevlin18/sholl-analysis-python/issues"
 
 [tool.setuptools.packages.find]
 where = ["."]

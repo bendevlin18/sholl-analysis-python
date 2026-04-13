@@ -25,6 +25,7 @@ from .image_processing import (
     load_and_preprocess,
     detect_and_normalize,
     skeletonize_image,
+    dilate_skeleton,
     find_endpoints,
 )
 from .geometry import make_circles, calc_intersection
@@ -38,6 +39,7 @@ __all__ = [
     "load_and_preprocess",
     "detect_and_normalize",
     "skeletonize_image",
+    "dilate_skeleton",
     "find_endpoints",
     "smooth_binary",
     "make_circles",

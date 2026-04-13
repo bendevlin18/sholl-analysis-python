@@ -65,12 +65,10 @@ def calc_intersection(
     intersects : np.ndarray
         Flat array of interleaved (row, col) pairs for every intersection.
     """
-    intersects = []
-    for i in range(circ_arr.shape[0]):
-        for j in range(circ_arr.shape[1]):
-            if circ_arr[i][j] == skeleton_arr[i][j]:
-                intersects = np.append(intersects, [i, j])
-    return np.asarray(intersects)
+    rows, cols = np.where((circ_arr == 255) & (skeleton_arr == 255))
+    if len(rows) == 0:
+        return np.array([])
+    return np.column_stack([rows, cols]).flatten()
 
 
 # ---------------------------------------------------------------------------
@@ -91,11 +89,7 @@ def x_y_separate(arr: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
     x : np.ndarray   (rows)
     y : np.ndarray   (cols)
     """
-    xs, ys = [], []
-    for row, col in zip(arr[::2], arr[1::2]):
-        xs = np.append(xs, row)
-        ys = np.append(ys, col)
-    return np.asarray(xs), np.asarray(ys)
+    return arr[::2], arr[1::2]
 
 
 def dist_formula(x1: float, y1: float, x2: float, y2: float) -> float:
@@ -127,7 +121,7 @@ def clean_intersections(raw_z: list, radii: np.ndarray, merge_dist: float = 10.0
     """
     import pandas as pd
 
-    intersections_to_plot = pd.DataFrame()
+    frames = []
 
     for idx, vals_raw in zip(radii, raw_z):
         vals = vals_raw if not hasattr(vals_raw, "dropna") else vals_raw.dropna().values
@@ -135,17 +129,16 @@ def clean_intersections(raw_z: list, radii: np.ndarray, merge_dist: float = 10.0
             continue
 
         x, y = x_y_separate(vals)
-        cleaned = pd.DataFrame({0: x, 1: y})
 
-        # Merge nearby points by snapping them to the first encountered neighbour
-        for cur_idx, cur_row in cleaned.iterrows():
-            for new_idx, new_row in cleaned.iterrows():
-                if dist_formula(cur_row[0], cur_row[1], new_row[0], new_row[1]) < merge_dist:
-                    cleaned.loc[new_idx] = cleaned.loc[cur_idx]
+        # Snap each coordinate to the nearest merge_dist grid cell, then
+        # drop duplicates.  This is O(n) and replaces the previous O(n²)
+        # double-iterrows loop that compared every pair of points.
+        snapped_x = np.round(x / merge_dist) * merge_dist
+        snapped_y = np.round(y / merge_dist) * merge_dist
 
-        final = cleaned.drop_duplicates().copy()
-        final["ring"] = idx
-        final.set_index("ring", inplace=True)
-        intersections_to_plot = pd.concat([intersections_to_plot, final])
+        frame = pd.DataFrame({0: snapped_x, 1: snapped_y}).drop_duplicates().copy()
+        frame["ring"] = idx
+        frame.set_index("ring", inplace=True)
+        frames.append(frame)
 
-    return intersections_to_plot
+    return pd.concat(frames) if frames else pd.DataFrame()

@@ -84,6 +84,13 @@ def detect_and_normalize(img: np.ndarray) -> np.ndarray:
 
     unique_vals = np.unique(img)
 
+    if len(unique_vals) < 2:
+        raise ValueError(
+            f"Expected a binary image with exactly 2 unique pixel values, "
+            f"got {len(unique_vals)}: {unique_vals}. "
+            f"The image appears to be blank (all one value)."
+        )
+
     if len(unique_vals) > 2:
         raise ValueError(
             f"Expected a binary image with exactly 2 unique pixel values, "
@@ -183,7 +190,7 @@ def skeletonize_image(
     skeleton = skeletonize(bool_img)
 
     processed = remove_small_objects(
-        skeleton, min_size=min_size, connectivity=connectivity
+        skeleton, max_size=min_size, connectivity=connectivity
     ).astype(np.uint8)
 
     processed_skeleton = np.where(processed > 0, 255, 0).astype(float)
@@ -234,8 +241,8 @@ def find_endpoints(skeleton: np.ndarray):
 
     endpoint_arr = generic_filter(skeleton, _num_endpoints, (3, 3))
 
-    counts = np.unique(endpoint_arr, return_counts=True)
-    n_endpoints = counts[1][1] if len(counts[1]) > 1 else 0
+    unique_vals, val_counts = np.unique(endpoint_arr, return_counts=True)
+    n_endpoints = val_counts[1] if len(val_counts) > 1 else 0
 
     return endpoint_arr, n_endpoints
 

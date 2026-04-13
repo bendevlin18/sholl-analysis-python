@@ -237,6 +237,7 @@ class ShollAnalyzer:
 
         print("Tip: all controls are keyboard shortcuts on the figure window.\n")
 
+        existing_summary = self._load_existing_summary(dirs["root"])
         summary_rows = {}
         skipped = []
 
@@ -264,7 +265,7 @@ class ShollAnalyzer:
         except KeyboardInterrupt:
             print("\n\nInterrupted — saving progress so far …")
 
-        return self._finalise(summary_rows, skipped, dirs)
+        return self._finalise(summary_rows, skipped, dirs, existing_summary)
 
     def process_single(
         self,
@@ -286,14 +287,17 @@ class ShollAnalyzer:
 
         Returns
         -------
-        counts : np.ndarray
-            Per-radius intersection counts.
+        counts : np.ndarray or None
+            Per-radius intersection counts, or ``None`` if the user cancelled.
         """
         if stem is None:
             stem = get_stem(os.path.basename(filepath))
         dirs = ensure_output_dirs(os.path.dirname(output_dir),
                                   subdir=os.path.basename(output_dir))
-        counts, _ = self._process_image(filepath, stem, dirs)
+        try:
+            counts, _ = self._process_image(filepath, stem, dirs)
+        except UserCancelledError:
+            return None
         return counts
 
     # ------------------------------------------------------------------
@@ -368,7 +372,7 @@ class ShollAnalyzer:
             for circ in tqdm(circles, leave=False):
                 hits = calc_intersection(circ, mgla_arr)
                 raw_z.append(hits)
-                intersection_counts.append(len(hits) / 2)
+                intersection_counts.append(len(hits) // 2)
         except KeyboardInterrupt:
             print("\n  Counting interrupted.")
             raise UserCancelledError("skip")
@@ -469,10 +473,27 @@ class ShollAnalyzer:
             return pd.read_csv(summary_path, index_col="image")
         return pd.DataFrame()
 
-    def _finalise(self, summary_rows: dict, skipped: list, dirs: dict) -> pd.DataFrame:
+    def _finalise(
+        self,
+        summary_rows: dict,
+        skipped: list,
+        dirs: dict,
+        existing_summary: pd.DataFrame | None = None,
+    ) -> pd.DataFrame:
         """Write the summary CSV to the root dir and print a completion report."""
-        summary = pd.DataFrame(summary_rows, index=self.radii).T
-        summary.index.name = "image"
+        new_summary = pd.DataFrame(summary_rows, index=self.radii).T
+        new_summary.index.name = "image"
+
+        if existing_summary is not None and not existing_summary.empty:
+            # Drop any rows that were re-processed (new results take precedence)
+            prior = existing_summary.drop(
+                index=[s for s in summary_rows if s in existing_summary.index],
+                errors="ignore",
+            )
+            summary = pd.concat([prior, new_summary])
+        else:
+            summary = new_summary
+
         summary.to_csv(os.path.join(dirs["root"], "sholl_summary.csv"))
 
         n_done = len(summary_rows)

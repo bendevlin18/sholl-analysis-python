@@ -106,8 +106,16 @@ def test_normalize_1_255():
 
 
 def test_normalize_raises_on_non_binary():
-    arr = np.array([0, 1, 2, 3], dtype=np.uint8)
-    with pytest.raises(ValueError):
+    # Must be a 2-D array with more than 2 unique values to hit the binary check
+    arr = np.array([[0, 1], [2, 3]], dtype=np.uint8)
+    with pytest.raises(ValueError, match="binary image"):
+        detect_and_normalize(arr)
+
+
+def test_normalize_raises_on_blank_image():
+    # All-zero image has only one unique value — should raise, not silently return garbage
+    arr = np.zeros((50, 50), dtype=np.uint8)
+    with pytest.raises(ValueError, match="blank"):
         detect_and_normalize(arr)
 
 
@@ -203,3 +211,102 @@ def test_normalize_inverted_0_255():
     # signal pixels (0 in input) should become 255 in output
     assert np.all(out[arr == 0] == 255)
     assert np.all(out[arr == 255] == 0)
+
+
+# ---------------------------------------------------------------------------
+# Tests for skeletonize_image, dilate_skeleton, find_endpoints, smooth_binary
+# ---------------------------------------------------------------------------
+
+from sholl_analysis.image_processing import (
+    skeletonize_image,
+    dilate_skeleton,
+    find_endpoints,
+    smooth_binary,
+)
+
+
+def _make_normalized(size=64, signal_frac=0.1):
+    """Small {0, 255} uint8 image for processing tests."""
+    return _make_binary(0, 255, size=size, signal_frac=signal_frac)
+
+
+def test_skeletonize_output_shape():
+    img = _make_normalized()
+    skel = skeletonize_image(img)
+    assert skel.shape == img.shape
+
+
+def test_skeletonize_output_values():
+    """Skeleton should only contain 0 and 255."""
+    img = _make_normalized()
+    skel = skeletonize_image(img)
+    assert set(np.unique(skel)).issubset({0.0, 255.0})
+
+
+def test_skeletonize_raises_on_non_2d():
+    img = np.zeros((10, 10, 3), dtype=np.uint8)
+    with pytest.raises(ValueError):
+        skeletonize_image(img)
+
+
+def test_dilate_skeleton_shape():
+    img = _make_normalized()
+    skel = skeletonize_image(img)
+    dilated = dilate_skeleton(skel, radius=1)
+    assert dilated.shape == skel.shape
+
+
+def test_dilate_skeleton_expands_signal():
+    """Dilation should produce at least as many signal pixels as the input."""
+    img = _make_normalized()
+    skel = skeletonize_image(img)
+    dilated = dilate_skeleton(skel, radius=2)
+    assert np.sum(dilated > 0) >= np.sum(skel > 0)
+
+
+def test_find_endpoints_shape():
+    img = _make_normalized()
+    skel = skeletonize_image(img)
+    ep_arr, n_ep = find_endpoints(skel)
+    assert ep_arr.shape == skel.shape
+
+
+def test_find_endpoints_count_non_negative():
+    img = _make_normalized()
+    skel = skeletonize_image(img)
+    _, n_ep = find_endpoints(skel)
+    assert n_ep >= 0
+
+
+def test_find_endpoints_blank_skeleton():
+    """All-zero skeleton should produce zero endpoints."""
+    blank = np.zeros((50, 50), dtype=float)
+    ep_arr, n_ep = find_endpoints(blank)
+    assert n_ep == 0
+    assert np.all(ep_arr == 0)
+
+
+def test_smooth_binary_output_shape():
+    img = _make_normalized()
+    smoothed = smooth_binary(img, gaussian_sigma=1.0)
+    assert smoothed.shape == img.shape
+
+
+def test_smooth_binary_output_values():
+    """Smoothed image should remain binary {0, 255}."""
+    img = _make_normalized()
+    smoothed = smooth_binary(img, gaussian_sigma=1.0)
+    assert set(np.unique(smoothed)).issubset({0, 255})
+
+
+def test_smooth_binary_zero_sigma_passthrough():
+    """sigma=0 should return the image unchanged."""
+    img = _make_normalized()
+    smoothed = smooth_binary(img, gaussian_sigma=0)
+    assert np.array_equal(smoothed, img)
+
+
+def test_smooth_binary_raises_on_non_2d():
+    img = np.zeros((10, 10, 3), dtype=np.uint8)
+    with pytest.raises(ValueError):
+        smooth_binary(img, gaussian_sigma=1.0)
