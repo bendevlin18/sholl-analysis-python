@@ -119,6 +119,7 @@ analyzer = ShollAnalyzer(
 
     # Physical units
     pixel_size=1.0,         # µm per pixel — converts all radii and stats to µm (default 1.0 = stay in pixels)
+    use_micron=False,       # if True, start/step/end are given in µm instead of pixels (requires pixel_size)
 
     # Skeleton processing
     min_object_size=10,     # min fragment size to keep (px); removes isolated noise
@@ -220,6 +221,7 @@ sholl-analysis --input /path/to/tiffs --output /path/to/results
 --step          Step size in pixels (default: 30)
 --end           End radius in pixels (default: 1024)
 --pixel-size    Pixel size in µm/px — converts radii and stats to µm (default: 1.0 = pixels)
+--use-micron    Treat --start/--step/--end as µm instead of pixels (requires --pixel-size)
 --min-size      Min skeleton fragment size in pixels (default: 10)
 --dilation      Skeleton dilation radius (default: 1)
 --merge-dist    Max distance to merge nearby intersections (default: 10.0)
@@ -269,7 +271,11 @@ skeleton = skeletonize_image(img_smooth)
 
 ## Physical Units (Pixel Size)
 
-By default, all radii are reported in **pixels**. If you know the pixel size of your microscope images (µm/px), pass it via `pixel_size` to get real-world units throughout — in the summary CSV, the Sholl curve x-axis, and all derived statistics.
+By default, all radii are reported in **pixels**. If you know the pixel size of your microscope images (µm/px), you can work entirely in µm — both for specifying ring parameters and for all outputs.
+
+### Option 1 — Output in µm, ring parameters still in pixels
+
+Pass `pixel_size` alone. `start_radius`, `step_size`, and `end_radius` stay in pixels; all outputs are scaled to µm.
 
 ```python
 analyzer = ShollAnalyzer(
@@ -280,11 +286,27 @@ analyzer = ShollAnalyzer(
 )
 ```
 
+### Option 2 — Everything in µm (recommended)
+
+Pass both `pixel_size` and `use_micron=True`. Now `start_radius`, `step_size`, and `end_radius` are given in µm, and the package converts them to pixels internally for geometry. All outputs are in µm.
+
+```python
+analyzer = ShollAnalyzer(
+    start_radius=2.0,   # µm
+    step_size=2.0,      # µm
+    end_radius=50.0,    # µm
+    pixel_size=0.065,
+    use_micron=True,
+)
+```
+
 Or via the CLI:
 
 ```bash
-sholl-analysis --input ./tiffs --pixel-size 0.065
+sholl-analysis --input ./tiffs --pixel-size 0.065 --use-micron --start 2 --step 2 --end 50
 ```
+
+> **Note:** `use_micron=True` requires `pixel_size` to be set. The package will raise an error immediately if you forget.
 
 **What changes when `pixel_size` is set:**
 

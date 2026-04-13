@@ -13,6 +13,7 @@ from sholl_analysis.geometry import (
     clean_intersections,
     sholl_stats,
 )
+from sholl_analysis.analyzer import ShollAnalyzer
 
 
 def test_dist_formula_zero():
@@ -369,3 +370,36 @@ def test_sholl_stats_all_zero_counts():
     assert stats["max_intersections"] == 0.0
     assert stats["mean_intersections"] == 0.0
     assert np.isnan(stats["schoenen_ramification_index"])
+
+
+# ---------------------------------------------------------------------------
+# Tests for use_micron
+# ---------------------------------------------------------------------------
+
+def test_use_micron_requires_pixel_size():
+    """use_micron=True without pixel_size should raise immediately."""
+    with pytest.raises(ValueError, match="pixel_size"):
+        ShollAnalyzer(use_micron=True)
+
+
+def test_use_micron_converts_radii():
+    """With use_micron=True, radii stored internally should be in pixels."""
+    pixel_size = 0.1       # µm/px
+    start_um, step_um, end_um = 1.0, 1.0, 5.0
+    analyzer = ShollAnalyzer(
+        start_radius=start_um,
+        step_size=step_um,
+        end_radius=end_um,
+        pixel_size=pixel_size,
+        use_micron=True,
+    )
+    expected_px = np.arange(start_um, end_um, step_um) / pixel_size
+    assert np.allclose(analyzer.radii, expected_px)
+
+
+def test_use_micron_false_keeps_pixel_radii():
+    """Default use_micron=False should leave radii unchanged."""
+    analyzer = ShollAnalyzer(start_radius=20, step_size=30, end_radius=200,
+                             pixel_size=0.065)
+    expected = np.arange(20, 200, 30, dtype=float)
+    assert np.allclose(analyzer.radii, expected)

@@ -42,6 +42,8 @@ def main():
     # Scale
     parser.add_argument("--pixel-size", type=float, default=1.0,
                         help="Pixel size in µm/px. Converts radii and curve x-axis to µm (default 1.0 = pixels).")
+    parser.add_argument("--use-micron", action="store_true",
+                        help="Interpret --start/--step/--end as µm instead of pixels. Requires --pixel-size.")
 
     # Display
     parser.add_argument("--show-curve",  action="store_true",  help="Show the Sholl curve plot for each image.")
@@ -64,6 +66,7 @@ def main():
         save_figures=not args.no_save,
         figure_dpi=args.dpi,
         pixel_size=args.pixel_size,
+        use_micron=args.use_micron,
     )
 
     try:

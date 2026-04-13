@@ -152,7 +152,13 @@ class ShollAnalyzer:
         show_endpoints: bool = False,
         endpoint_size: int = 15,
         pixel_size: float = 1.0,
+        use_micron: bool = False,
     ):
+        if use_micron and pixel_size == 1.0:
+            raise ValueError(
+                "use_micron=True requires pixel_size to be set. "
+                "Pass pixel_size=<µm/px> to ShollAnalyzer, e.g. pixel_size=0.065."
+            )
         self.start_radius = start_radius
         self.step_size = step_size
         self.end_radius = end_radius
@@ -168,7 +174,13 @@ class ShollAnalyzer:
         self.show_endpoints = show_endpoints
         self.endpoint_size = endpoint_size
         self.pixel_size = pixel_size
-        self.radii = np.arange(start_radius, end_radius, step_size)
+        self.use_micron = use_micron
+        # When use_micron=True, ring parameters are given in µm and converted
+        # to pixels for internal geometry; output is scaled back to µm via pixel_size.
+        if use_micron:
+            self.radii = np.arange(start_radius, end_radius, step_size) / pixel_size
+        else:
+            self.radii = np.arange(start_radius, end_radius, step_size)
 
     # ------------------------------------------------------------------
     # Public API
@@ -545,6 +557,7 @@ class ShollAnalyzer:
             f"step_size={self.step_size}, "
             f"end_radius={self.end_radius}, "
             f"pixel_size={self.pixel_size}, "
+            f"use_micron={self.use_micron}, "
             f"show_sholl_curve={self.show_sholl_curve}, "
             f"gaussian_sigma={self.gaussian_sigma})"
         )
