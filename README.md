@@ -308,6 +308,39 @@ sholl-analysis --input ./tiffs --pixel-size 0.065 --use-micron --start 2 --step 
 
 > **Note:** `use_micron=True` requires `pixel_size` to be set. The package will raise an error immediately if you forget.
 
+### Considerations when using `use_micron=True`
+
+**Only ring geometry is in µm — processing parameters stay in pixels.**
+
+`start_radius`, `step_size`, and `end_radius` are converted to pixels internally, but the following parameters are always in pixels regardless of `use_micron`:
+
+| Parameter | Unit | Typical value |
+|---|---|---|
+| `merge_dist` | pixels | 10 |
+| `min_object_size` | pixels | 10 |
+| `dilation_radius` | pixels | 1 |
+
+If you're working at a known pixel size and want to think about these in µm, just divide manually: e.g. for 0.5 µm merge distance at 0.065 µm/px → `merge_dist = 0.5 / 0.065 ≈ 8`.
+
+---
+
+**Make sure `end_radius` fits inside the image.**
+
+With `use_micron=True`, the end radius in pixels is `end_radius / pixel_size`. This must be smaller than the shortest image dimension. For example, a 512 × 512 image at 0.065 µm/px has a maximum useful radius of `512 × 0.065 ≈ 33 µm`. Setting `end_radius=50` would silently produce no intersections beyond the image edge — rings are clipped to the image boundary.
+
+A quick way to check in Python:
+```python
+max_radius_um = min(image_height, image_width) * pixel_size / 2
+```
+
+---
+
+**`use_micron=True` is especially useful for cross-dataset consistency.**
+
+If you image the same cell type across multiple sessions or microscopes with different pixel sizes, specifying ring parameters in µm means you're always sampling at the same biological scale — no manual conversion needed between datasets. With pixel-based parameters, a `step_size=30` means something different on a 20× vs. 63× objective.
+
+---
+
 **What changes when `pixel_size` is set:**
 
 - Column headers in `sholl_summary.csv` are in µm (e.g. `1.3`, `3.25`, …) instead of pixels
