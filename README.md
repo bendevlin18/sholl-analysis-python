@@ -19,6 +19,7 @@ Sholl analysis quantifies the complexity of dendritic/microglial arbors by count
   - [Processing a Single Image](#processing-a-single-image)
   - [Using the CLI](#using-the-cli)
 - [Gaussian Smoothing](#gaussian-smoothing)
+- [Physical Units (Pixel Size)](#physical-units-pixel-size)
 - [Working with Test Images](#working-with-test-images)
 - [Module Reference](#module-reference)
 - [Troubleshooting](#troubleshooting)
@@ -116,6 +117,9 @@ analyzer = ShollAnalyzer(
     step_size=30,           # spacing between rings (px)
     end_radius=1024,        # outermost ring (px)
 
+    # Physical units
+    pixel_size=1.0,         # µm per pixel — converts all radii and stats to µm (default 1.0 = stay in pixels)
+
     # Skeleton processing
     min_object_size=10,     # min fragment size to keep (px); removes isolated noise
     dilation_radius=1,      # skeleton dilation before counting; helps catch edge intersections
@@ -179,7 +183,7 @@ All outputs are written to the output directory (default: `<input_dir>/sholl_out
 | `intersections/<stem>_raw_intersections.csv` | Per-ring intersection coordinates and endpoint count |
 | `skeleton_plots/sholl_<stem>.png` | Annotated skeleton figure with rings, intersections, and endpoints |
 | `sholl_curves/sholl_curve_<stem>.png` | Sholl curve plot (intersections vs. radius) |
-| `sholl_summary.csv` | One row per image, one column per radius — the main results table |
+| `sholl_summary.csv` | One row per image — per-radius intersection counts plus derived statistics (critical radius, max intersections, mean intersections, AUC, Schoenen ramification index) |
 
 The `sholl_summary.csv` is always written at the end of a run, even if cancelled early. Re-running on the same folder skips images whose CSV already exists, so you can safely resume a batch.
 
@@ -215,6 +219,7 @@ sholl-analysis --input /path/to/tiffs --output /path/to/results
 --start         Start radius in pixels (default: 20)
 --step          Step size in pixels (default: 30)
 --end           End radius in pixels (default: 1024)
+--pixel-size    Pixel size in µm/px — converts radii and stats to µm (default: 1.0 = pixels)
 --min-size      Min skeleton fragment size in pixels (default: 10)
 --dilation      Skeleton dilation radius (default: 1)
 --merge-dist    Max distance to merge nearby intersections (default: 10.0)
@@ -259,6 +264,45 @@ img, _ = load_and_preprocess("cell.tiff")
 img_smooth = smooth_binary(img, gaussian_sigma=1.5)
 skeleton = skeletonize_image(img_smooth)
 ```
+
+---
+
+## Physical Units (Pixel Size)
+
+By default, all radii are reported in **pixels**. If you know the pixel size of your microscope images (µm/px), pass it via `pixel_size` to get real-world units throughout — in the summary CSV, the Sholl curve x-axis, and all derived statistics.
+
+```python
+analyzer = ShollAnalyzer(
+    start_radius=20,
+    step_size=30,
+    end_radius=600,
+    pixel_size=0.065,   # e.g. 0.065 µm/px for a 63× oil objective
+)
+```
+
+Or via the CLI:
+
+```bash
+sholl-analysis --input ./tiffs --pixel-size 0.065
+```
+
+**What changes when `pixel_size` is set:**
+
+- Column headers in `sholl_summary.csv` are in µm (e.g. `1.3`, `3.25`, …) instead of pixels
+- `critical_radius` in the summary is in µm
+- `auc` is in intersections × µm instead of intersections × px
+- The Sholl curve x-axis is labeled `Radius (µm)`
+- The per-image completion message shows µm: `peak 8 intersections @ radius 9.1µm`
+
+**Finding your pixel size:**
+
+Your pixel size is determined by the objective and camera, and is usually recorded in the microscope metadata. Common sources:
+
+- **Fiji / ImageJ**: `Image → Properties` shows pixel width in µm
+- **TIFF metadata**: open in Fiji and check `Image → Show Info`
+- **Microscope software**: check acquisition settings or the image properties panel
+
+A typical value for a confocal with a 63× oil objective is ~0.065–0.13 µm/px depending on zoom and camera pixel pitch. Use the value from your actual acquisition.
 
 ---
 

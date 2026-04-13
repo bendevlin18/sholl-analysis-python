@@ -135,6 +135,7 @@ def plot_sholl_curve(
     title: str = "Sholl Analysis",
     save_path: str | None = None,
     dpi: int = 150,
+    x_unit: str = "px",
 ) -> plt.Figure:
     """
     Plot the classic Sholl curve (intersections vs. radius).
@@ -142,7 +143,7 @@ def plot_sholl_curve(
     Parameters
     ----------
     radii : np.ndarray
-        Ring radii.
+        Ring radii (in whatever unit the caller provides — px or µm).
     intersection_counts : np.ndarray
         Number of intersections at each radius.
     title : str, optional
@@ -151,10 +152,13 @@ def plot_sholl_curve(
         If given, save the figure to this path.
     dpi : int, optional
         Resolution for saved figure (default 150).
+    x_unit : str, optional
+        Unit label for the x-axis (default ``"px"``; pass ``"µm"`` when a
+        pixel size has been applied to *radii*).
     """
     fig, ax = plt.subplots(figsize=(8, 5))
     ax.plot(radii, intersection_counts, marker="o", linewidth=1.5)
-    ax.set_xlabel("Radius (px)")
+    ax.set_xlabel(f"Radius ({x_unit})")
     ax.set_ylabel("# Intersections")
     ax.set_title(title)
     ax.grid(True, alpha=0.3)

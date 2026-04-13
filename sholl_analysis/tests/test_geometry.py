@@ -11,6 +11,7 @@ from sholl_analysis.geometry import (
     x_y_separate,
     make_circles,
     clean_intersections,
+    sholl_stats,
 )
 
 
@@ -310,3 +311,61 @@ def test_smooth_binary_raises_on_non_2d():
     img = np.zeros((10, 10, 3), dtype=np.uint8)
     with pytest.raises(ValueError):
         smooth_binary(img, gaussian_sigma=1.0)
+
+
+# ---------------------------------------------------------------------------
+# Tests for sholl_stats
+# ---------------------------------------------------------------------------
+
+def test_sholl_stats_critical_radius():
+    radii = np.array([10, 20, 30, 40, 50], dtype=float)
+    counts = np.array([1, 2, 5, 3, 1], dtype=float)  # peak at index 2 → radius 30
+    stats = sholl_stats(radii, counts)
+    assert stats["critical_radius"] == 30.0
+
+
+def test_sholl_stats_max_intersections():
+    radii = np.array([10, 20, 30], dtype=float)
+    counts = np.array([2, 7, 4], dtype=float)
+    stats = sholl_stats(radii, counts)
+    assert stats["max_intersections"] == 7.0
+
+
+def test_sholl_stats_mean_intersections():
+    radii = np.array([10, 20, 30], dtype=float)
+    counts = np.array([2.0, 4.0, 6.0], dtype=float)
+    stats = sholl_stats(radii, counts)
+    assert np.isclose(stats["mean_intersections"], 4.0)
+
+
+def test_sholl_stats_auc():
+    radii = np.array([0.0, 1.0, 2.0], dtype=float)
+    counts = np.array([0.0, 1.0, 0.0], dtype=float)
+    stats = sholl_stats(radii, counts)
+    # trapz of a triangle with base 2 and height 1 = 1.0
+    assert np.isclose(stats["auc"], 1.0)
+
+
+def test_sholl_stats_schoenen_normal():
+    radii = np.array([10, 20, 30], dtype=float)
+    counts = np.array([2.0, 8.0, 4.0], dtype=float)  # primary=2, max=8
+    stats = sholl_stats(radii, counts)
+    assert np.isclose(stats["schoenen_ramification_index"], 4.0)
+
+
+def test_sholl_stats_schoenen_zero_primary():
+    """Schoenen index should be NaN when the innermost ring has no intersections."""
+    radii = np.array([10, 20, 30], dtype=float)
+    counts = np.array([0.0, 5.0, 3.0], dtype=float)
+    stats = sholl_stats(radii, counts)
+    assert np.isnan(stats["schoenen_ramification_index"])
+
+
+def test_sholl_stats_all_zero_counts():
+    """All-zero counts: peak is 0 at first radius, Schoenen is NaN."""
+    radii = np.array([10, 20, 30], dtype=float)
+    counts = np.zeros(3, dtype=float)
+    stats = sholl_stats(radii, counts)
+    assert stats["max_intersections"] == 0.0
+    assert stats["mean_intersections"] == 0.0
+    assert np.isnan(stats["schoenen_ramification_index"])

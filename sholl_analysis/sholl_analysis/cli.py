@@ -39,6 +39,10 @@ def main():
     parser.add_argument("--merge-dist", type=float, default=10.0,help="Max distance to merge nearby intersections (px).")
     parser.add_argument("--sigma",      type=float, default=0.0, help="Gaussian smoothing sigma (0 = off).")
 
+    # Scale
+    parser.add_argument("--pixel-size", type=float, default=1.0,
+                        help="Pixel size in µm/px. Converts radii and curve x-axis to µm (default 1.0 = pixels).")
+
     # Display
     parser.add_argument("--show-curve",  action="store_true",  help="Show the Sholl curve plot for each image.")
     parser.add_argument("--no-results",  action="store_true",  help="Hide the annotated skeleton plot.")
@@ -59,6 +63,7 @@ def main():
         show_results_plot=not args.no_results,
         save_figures=not args.no_save,
         figure_dpi=args.dpi,
+        pixel_size=args.pixel_size,
     )
 
     try:

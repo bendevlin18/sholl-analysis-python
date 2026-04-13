@@ -97,6 +97,43 @@ def dist_formula(x1: float, y1: float, x2: float, y2: float) -> float:
     return np.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2)
 
 
+def sholl_stats(radii: np.ndarray, counts: np.ndarray) -> dict:
+    """
+    Compute derived Sholl statistics from per-radius intersection counts.
+
+    Parameters
+    ----------
+    radii : np.ndarray
+        Radii at which intersections were counted (pixels).
+    counts : np.ndarray
+        Intersection count at each radius, same length as *radii*.
+
+    Returns
+    -------
+    dict with keys:
+        critical_radius              — radius at peak intersections
+        max_intersections            — peak count
+        mean_intersections           — mean count across all radii
+        auc                          — area under the Sholl curve (intersections × pixels,
+                                       trapezoidal integration)
+        schoenen_ramification_index  — max_intersections / primary_branches, where
+                                       primary_branches = count at the innermost ring;
+                                       NaN if the innermost count is zero
+    """
+    counts = np.asarray(counts, dtype=float)
+    peak_idx = int(np.argmax(counts))
+    max_int = counts[peak_idx]
+    primary = counts[0]
+
+    return {
+        "critical_radius": float(radii[peak_idx]),
+        "max_intersections": float(max_int),
+        "mean_intersections": float(np.mean(counts)),
+        "auc": float(np.trapezoid(counts, radii)),
+        "schoenen_ramification_index": float(max_int / primary) if primary > 0 else float("nan"),
+    }
+
+
 def clean_intersections(raw_z: list, radii: np.ndarray, merge_dist: float = 10.0):
     """
     Deduplicate nearby intersection points for each Sholl ring.

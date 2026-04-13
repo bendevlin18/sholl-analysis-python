@@ -18,7 +18,7 @@ from .image_processing import (
     find_endpoints,
     smooth_binary,
 )
-from .geometry import make_circles, calc_intersection, x_y_separate, clean_intersections
+from .geometry import make_circles, calc_intersection, x_y_separate, clean_intersections, sholl_stats
 from .visualization import plot_preview, plot_results, plot_sholl_curve
 from .io import save_intersections, ensure_output_dirs, csv_exists
 from .supported_formats import is_supported, get_stem, extensions_str
@@ -151,6 +151,7 @@ class ShollAnalyzer:
         intersection_size: int = 12,
         show_endpoints: bool = False,
         endpoint_size: int = 15,
+        pixel_size: float = 1.0,
     ):
         self.start_radius = start_radius
         self.step_size = step_size
@@ -166,6 +167,7 @@ class ShollAnalyzer:
         self.intersection_size = intersection_size
         self.show_endpoints = show_endpoints
         self.endpoint_size = endpoint_size
+        self.pixel_size = pixel_size
         self.radii = np.arange(start_radius, end_radius, step_size)
 
     # ------------------------------------------------------------------
@@ -304,6 +306,10 @@ class ShollAnalyzer:
     # Internal helpers
     # ------------------------------------------------------------------
 
+    @property
+    def _x_unit(self) -> str:
+        return "µm" if self.pixel_size != 1.0 else "px"
+
     def _process_image(self, filepath: str, stem: str, dirs: dict):
         """Full pipeline for one image. Returns (counts, action)."""
 
@@ -392,12 +398,8 @@ class ShollAnalyzer:
         save_intersections(intersections_to_plot, dirs["csvs"], stem)
 
         # 10. Endpoint coordinates
-        ep = []
-        for i in range(endpoint_arr.shape[0]):
-            for j in range(endpoint_arr.shape[1]):
-                if endpoint_arr[i][j] == 255.0:
-                    ep = np.append(ep, [i, j])
-        x_ep, y_ep = x_y_separate(ep)
+        ep = np.argwhere(endpoint_arr == 255.0)
+        x_ep, y_ep = ep[:, 0], ep[:, 1]
 
         # 11. Results plot → skeleton_plots/
         results_path = (
@@ -429,10 +431,11 @@ class ShollAnalyzer:
             if self.save_figures else None
         )
         fig_curve = plot_sholl_curve(
-            self.radii, intersection_counts,
+            self.radii * self.pixel_size, intersection_counts,
             title=f"Sholl Curve – {stem}",
             save_path=curve_path,
             dpi=self.figure_dpi,
+            x_unit=self._x_unit,
         )
         if self.show_sholl_curve:
             resp = _wait_for_key(
@@ -447,10 +450,11 @@ class ShollAnalyzer:
 
         # 13. Quick inline summary
         max_idx = np.argmax(intersection_counts)
+        peak_radius = self.radii[max_idx] * self.pixel_size
         print(
             f"  ✓  {n_endpoints} endpoints  |  "
             f"peak {int(intersection_counts[max_idx])} intersections "
-            f"@ radius {self.radii[max_idx]}px"
+            f"@ radius {peak_radius:.1f}{self._x_unit}"
         )
 
         plt.close("all")
@@ -467,10 +471,17 @@ class ShollAnalyzer:
         return result
 
     def _load_existing_summary(self, output_root: str) -> pd.DataFrame:
-        """Load and return an existing summary CSV if present."""
+        """Load and return an existing summary CSV if present.
+
+        Stat columns (string-named) are dropped so that only the per-radius
+        counts (numeric column names) are returned — stats are always
+        recomputed in ``_finalise``.
+        """
         summary_path = os.path.join(output_root, "sholl_summary.csv")
         if os.path.exists(summary_path):
-            return pd.read_csv(summary_path, index_col="image")
+            df = pd.read_csv(summary_path, index_col="image")
+            radius_cols = [c for c in df.columns if str(c).lstrip("-").isdigit()]
+            return df[radius_cols]
         return pd.DataFrame()
 
     def _finalise(
@@ -481,7 +492,8 @@ class ShollAnalyzer:
         existing_summary: pd.DataFrame | None = None,
     ) -> pd.DataFrame:
         """Write the summary CSV to the root dir and print a completion report."""
-        new_summary = pd.DataFrame(summary_rows, index=self.radii).T
+        scaled_radii = self.radii * self.pixel_size
+        new_summary = pd.DataFrame(summary_rows, index=scaled_radii).T
         new_summary.index.name = "image"
 
         if existing_summary is not None and not existing_summary.empty:
@@ -493,6 +505,16 @@ class ShollAnalyzer:
             summary = pd.concat([prior, new_summary])
         else:
             summary = new_summary
+
+        # Compute derived stats for every row and append as columns
+        scaled_radii = self.radii * self.pixel_size
+        stat_rows = {
+            stem: sholl_stats(scaled_radii, summary.loc[stem].values)
+            for stem in summary.index
+        }
+        stats_df = pd.DataFrame(stat_rows).T
+        stats_df.index.name = "image"
+        summary = pd.concat([summary, stats_df], axis=1)
 
         summary.to_csv(os.path.join(dirs["root"], "sholl_summary.csv"))
 
@@ -522,6 +544,7 @@ class ShollAnalyzer:
             f"start_radius={self.start_radius}, "
             f"step_size={self.step_size}, "
             f"end_radius={self.end_radius}, "
+            f"pixel_size={self.pixel_size}, "
             f"show_sholl_curve={self.show_sholl_curve}, "
             f"gaussian_sigma={self.gaussian_sigma})"
         )
