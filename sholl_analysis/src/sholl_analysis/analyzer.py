@@ -364,7 +364,8 @@ class ShollAnalyzer:
         circles = make_circles(center[0], self.radii, skeleton.shape)
 
         # 5. Preview — response collected via keypress on the figure
-        fig_preview = plot_preview(img_new, skeleton, center, circles)
+        fig_preview = plot_preview(img_new, skeleton, center, circles,
+                                   ring_color=self.ring_color, background=self.background)
         fig_preview.suptitle(stem, fontsize=10)
         resp = _wait_for_key(
             fig_preview,

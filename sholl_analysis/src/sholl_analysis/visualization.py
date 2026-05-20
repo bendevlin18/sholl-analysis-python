@@ -39,16 +39,26 @@ def plot_preview(
     processed_skeleton: np.ndarray,
     center: tuple,
     circles: list,
+    ring_color: str = "black",
+    background: str = "white",
 ) -> plt.Figure:
     """Side-by-side preview: original image (left) and skeleton + rings (right)."""
-    fig, (ax_orig, ax_skel) = plt.subplots(1, 2, figsize=(14, 5))
+    transparent = background == "transparent"
+    bg = "white" if transparent else background
+    cmap = "gray_r" if bg == "white" else "gray"
 
-    ax_orig.imshow(img_new, cmap="gray")
+    fig, (ax_orig, ax_skel) = plt.subplots(1, 2, figsize=(14, 5))
+    fig.patch.set_facecolor(bg)
+
+    for ax in (ax_orig, ax_skel):
+        ax.set_facecolor(bg)
+
+    ax_orig.imshow(img_new, cmap=cmap)
     ax_orig.set_title("Original Image")
 
-    ax_skel.imshow(processed_skeleton, cmap="gray")
+    ax_skel.imshow(processed_skeleton, cmap=cmap)
     ax_skel.set_title("Look good??")
-    _draw_rings(ax_skel, center, circles, processed_skeleton.shape)
+    _draw_rings(ax_skel, center, circles, processed_skeleton.shape, ring_color=ring_color)
     ax_skel.scatter(center[0][0], center[0][1], c="blue", s=40, zorder=5,
                     label="centre")
     ax_skel.legend(fontsize=8)
