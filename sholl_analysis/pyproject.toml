@@ -38,5 +38,4 @@ Homepage = "https://github.com/bendevlin18/sholl-analysis-python"
 Issues   = "https://github.com/bendevlin18/sholl-analysis-python/issues"
 
 [tool.setuptools.packages.find]
-where = ["."]
-include = ["sholl_analysis*"]
+where = ["src"]
