@@ -153,6 +153,9 @@ class ShollAnalyzer:
         endpoint_size: int = 15,
         pixel_size: float = 1.0,
         use_micron: bool = False,
+        ring_color: str = "black",
+        intersection_color: str = "red",
+        background: str = "white",
     ):
         if use_micron and pixel_size == 1.0:
             raise ValueError(
@@ -175,6 +178,9 @@ class ShollAnalyzer:
         self.endpoint_size = endpoint_size
         self.pixel_size = pixel_size
         self.use_micron = use_micron
+        self.ring_color = ring_color
+        self.intersection_color = intersection_color
+        self.background = background
         # When use_micron=True, ring parameters are given in µm and converted
         # to pixels for internal geometry; output is scaled back to µm via pixel_size.
         if use_micron:
@@ -425,6 +431,9 @@ class ShollAnalyzer:
             intersection_size=self.intersection_size,
             show_endpoints=self.show_endpoints,
             endpoint_size=self.endpoint_size,
+            ring_color=self.ring_color,
+            intersection_color=self.intersection_color,
+            background=self.background,
         )
         if self.show_results_plot:
             resp = _wait_for_key(

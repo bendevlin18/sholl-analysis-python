@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 from matplotlib.patches import Circle
 
 
-def _draw_rings(ax, center, circles, image_shape):
+def _draw_rings(ax, center, circles, image_shape, ring_color: str = "black"):
     """
     Draw Sholl rings as matplotlib Circle patches directly onto *ax*.
 
@@ -26,7 +26,7 @@ def _draw_rings(ax, center, circles, image_shape):
             (cx, cy),
             radius=radius,
             fill=False,
-            edgecolor="cyan",
+            edgecolor=ring_color,
             linewidth=0.8,
             alpha=0.6,
             zorder=3,
@@ -69,6 +69,9 @@ def plot_results(
     intersection_size: int = 12,
     show_endpoints: bool = False,
     endpoint_size: int = 15,
+    ring_color: str = "black",
+    intersection_color: str = "red",
+    background: str = "white",
 ) -> plt.Figure:
     """
     Final results figure: skeleton, rings, intersection scatter, and endpoints.
@@ -97,20 +100,36 @@ def plot_results(
         Whether to plot endpoint triangles (default False).
     endpoint_size : int, optional
         Marker size for endpoint triangles (default 15).
+    ring_color : str, optional
+        Color for Sholl rings (default ``"black"``).
+    intersection_color : str, optional
+        Color for intersection scatter points (default ``"red"``).
+    background : str, optional
+        Figure background color (default ``"white"``). Pass
+        ``"transparent"`` to save with a transparent background.
+        When ``"white"`` or ``"transparent"``, the skeleton is rendered
+        dark-on-light (``gray_r`` colormap); when ``"black"``, it is
+        rendered light-on-dark (``gray`` colormap).
     """
-    fig, ax = plt.subplots(1, figsize=(10, 10))
+    transparent = background == "transparent"
+    bg = "white" if transparent else background
+    cmap = "gray_r" if bg == "white" else "gray"
 
-    ax.imshow(processed_skeleton, cmap="gray")
+    fig, ax = plt.subplots(1, figsize=(10, 10))
+    fig.patch.set_facecolor(bg)
+    ax.set_facecolor(bg)
+
+    ax.imshow(processed_skeleton, cmap=cmap)
     ax.set_title(title)
 
-    _draw_rings(ax, center, circles, processed_skeleton.shape)
+    _draw_rings(ax, center, circles, processed_skeleton.shape, ring_color=ring_color)
 
     ax.scatter(center[0][0], center[0][1], c="blue", s=40, zorder=5,
                label="centre")
     ax.scatter(
         intersections_to_plot[1].values,
         intersections_to_plot[0].values,
-        c="orange", s=intersection_size,
+        c=intersection_color, s=intersection_size,
         label="intersections", zorder=4,
     )
 
@@ -124,7 +143,7 @@ def plot_results(
     ax.legend()
 
     if save_path:
-        fig.savefig(save_path, dpi=dpi, bbox_inches="tight")
+        fig.savefig(save_path, dpi=dpi, bbox_inches="tight", transparent=transparent)
 
     return fig
 
