@@ -8,12 +8,14 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Installation & Setup
 
-The package source lives in the `sholl_analysis/` subdirectory. Install from there:
+The package uses a `src/` layout. The installable project root is `sholl_analysis/` and the actual package source is at `sholl_analysis/src/sholl_analysis/`. Install from the project root:
 
 ```bash
 cd sholl_analysis
 pip install -e .
 ```
+
+The `src/` layout is intentional — it prevents the outer `sholl_analysis/` directory from shadowing the installed package as a namespace package when Python is invoked from the project root.
 
 Python >= 3.10 is required (uses `|` union type hint syntax).
 
@@ -71,4 +73,4 @@ Image Load → Normalize → [Optional Smoothing] → Skeletonize → Interactiv
 
 ### Version Note
 
-`pyproject.toml` has `version = "0.1.0"` but `__init__.py` exports `__version__ = "0.2.0"`. The `__init__.py` version is the authoritative one.
+`__init__.py` exports `__version__ = "0.2.0"`, which is the authoritative version. Keep `pyproject.toml` in sync with it.
