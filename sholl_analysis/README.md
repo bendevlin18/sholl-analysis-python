@@ -19,6 +19,7 @@ Sholl analysis quantifies the complexity of dendritic/microglial arbors by count
   - [Processing a Single Image](#processing-a-single-image)
   - [Using the CLI](#using-the-cli)
 - [Gaussian Smoothing](#gaussian-smoothing)
+- [Plot Style](#plot-style)
 - [Working with Test Images](#working-with-test-images)
 - [Module Reference](#module-reference)
 - [Troubleshooting](#troubleshooting)
@@ -121,10 +122,15 @@ analyzer = ShollAnalyzer(
     gaussian_sigma=0.0,     # Gaussian smoothing before skeletonizing (0 = off)
 
     # Display options
-    show_sholl_curve=False, # pop up the Sholl curve plot per image (always saved to disk)
-    show_results_plot=True, # pop up the annotated skeleton plot per image
-    save_figures=True,      # save PNG figures to the output directory
-    figure_dpi=150,         # resolution of saved figures
+    show_sholl_curve=False,       # pop up the Sholl curve plot per image (always saved to disk)
+    show_results_plot=True,       # pop up the annotated skeleton plot per image
+    save_figures=True,            # save PNG figures to the output directory
+    figure_dpi=150,               # resolution of saved figures
+
+    # Plot style
+    background="white",           # figure background: "white", "black", or "transparent"
+    ring_color="black",           # color of Sholl rings
+    intersection_color="red",     # color of intersection scatter points
 )
 ```
 
@@ -256,6 +262,36 @@ from sholl_analysis import load_and_preprocess, smooth_binary, skeletonize_image
 img, _ = load_and_preprocess("cell.tiff")
 img_smooth = smooth_binary(img, gaussian_sigma=1.5)
 skeleton = skeletonize_image(img_smooth)
+```
+
+---
+
+## Plot Style
+
+The appearance of saved skeleton PNGs is configurable:
+
+```python
+analyzer = ShollAnalyzer(
+    background="white",        # "white" (default), "black", or "transparent"
+    ring_color="black",        # any matplotlib color string
+    intersection_color="red",  # any matplotlib color string
+)
+```
+
+When `background="white"` or `"transparent"`, the skeleton is rendered dark-on-light. When `background="black"`, it renders light-on-dark (the original style).
+
+**Transparent PNG:**
+
+```python
+analyzer = ShollAnalyzer(background="transparent")
+```
+
+The saved PNG will have a transparent background, useful for figures in papers or presentations.
+
+**Original dark style:**
+
+```python
+analyzer = ShollAnalyzer(background="black", ring_color="cyan", intersection_color="orange")
 ```
 
 ---
